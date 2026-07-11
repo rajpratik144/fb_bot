@@ -1,0 +1,6 @@
+playwright
+playwright-stealth
+langchain
+langchain-groq
+langgraph
+python-dotenv
