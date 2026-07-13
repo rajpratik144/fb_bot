@@ -1,115 +1,115 @@
-# # main.py
-# import time, os, random
-# from core.browser import BrowserEngine
-# from core.agent import FacebookAgent
-# from tools.messenger import MessengerTool
-# from tools.feed import FeedTool
-# from dotenv import load_dotenv
-
-# load_dotenv()
-
-# def run_simple_bot():
-#     engine = BrowserEngine(headless=False)
-#     ai_brain = FacebookAgent()
-    
-#     try:
-#         engine.start()
-#         messenger = MessengerTool(engine)
-#         feed = FeedTool(engine)
-        
-#         print("Listening for messages...")
-#         engine.page.goto("https://www.facebook.com/messages/t/1742551683409374") # Your self-chat
-#         engine.random_wait(5, 8)
-        
-#         last_seen = ""
-        
-#         # Run for 10 minutes
-#         end_time = time.time() + 600
-#         while time.time() < end_time:
-#             current_msg = messenger.get_latest_message()
-            
-#             if current_msg and current_msg != last_seen:
-#                 print(f"New Message: {current_msg}")
-#                 last_seen = current_msg
-                
-#                 # Ask AI what to do
-#                 # (Using your existing decide_action method)
-#                 response = ai_brain.decide_action(current_msg, [], "Boss", True)
-                
-#                 if "COMMAND:POST" in response:
-#                     post_text = response.split("|")[-1].strip()
-#                     feed.create_text_post(post_text)
-#                     messenger.send_reply("Post created!")
-#                 else:
-#                     messenger.send_reply(response)
-                    
-#             time.sleep(5)
-
-#     except Exception as e:
-#         print(f"Error: {e}")
-#     finally:
-#         engine.stop()
-
-# if __name__ == "__main__":
-#     run_simple_bot()
-
 # main.py
-import os, time, random, datetime
+import os
+import time
+import random
+import datetime
+import traceback
 from dotenv import load_dotenv
+
+# Core Module Imports
 from core.browser import BrowserEngine
 from core.agent import FacebookBrain
 from core.topics import TopicManager
+from core.db import init_db, log_successful_post, get_today_post_count
+
+# Tool Module Imports
 from tools.lurker import Lurker
 from tools.feed import FeedPoster
 
 load_dotenv()
 
-def run_autonomous_session():
-    engine = BrowserEngine(headless=False)
+def execute_autonomous_session():
+    """
+    A complete autonomous cycle: 
+    1. Start Browser -> 2. Lurk -> 3. Think -> 4. Download -> 5. Post -> 6. Log
+    """
+    # init_db ensures app_memory.db exists
+    init_db()
+    
+    # Set headless=True for background server deployment
+    engine = BrowserEngine(headless=False) 
     brain = FacebookBrain()
     topics = TopicManager()
     
+    media_path = None
+    
     try:
+        print(f"\n🚀 STARTING AUTONOMOUS SESSION: {datetime.datetime.now().strftime('%H:%M:%S')}")
         engine.start()
-        lurker = Lurker(engine)
+        
+        # lurker = Lurker(engine)
         poster = FeedPoster(engine)
 
-        # 1. Human Simulation: Visit random pages first
-        lurker.simulate_browsing()
+        # --- PHASE 1: HUMAN SIMULATION (LURKING) ---
+        # Mimics a real user scrolling through random parts of Facebook
+        # lurker.simulate_browsing()
 
-        # 2. Select Topic & Generate Content
+        # --- PHASE 2: BRAIN & CONTENT GENERATION ---
         topic = topics.get_random_topic()
+        print(f"🎯 Selected Topic from CSV: {topic}")
+        
+        # Generate the caption using LLM
         content = brain.generate_post(topic)
-        print(f"Goal: Post about '{topic}'")
+        
+        # Generate the AI Image (Synthesize -> URL -> Download)
+        print("🎨 Brain is synthesizing AI visuals...")
+        image_url = brain.generate_ai_image(topic)
+        media_path = engine.download_media(image_url, "autonomous_upload.jpg")
 
-        # 3. Action: Post with Human Typing
-        if poster.post_text(content):
-            print(f"Success at {datetime.datetime.now().strftime('%H:%M:%S')}")
+        # --- PHASE 3: EXECUTION (THE DISPATCH) ---
+        print("🚀 Navigating to Feed for dispatch...")
+        # Uses the improved 'Media-First' and 'Technical Lock' logic
+        success = poster.post_with_media(content, media_path)
+
+        if success:
+            # --- PHASE 4: RECORDING SUCCESS ---
+            log_successful_post(topic)
+            total_today = get_today_post_count()
+            print(f"✅ SUCCESS: Post is live. Daily Total: {total_today}")
         else:
-            print("Failure.")
+            print("❌ FAILURE: Post sequence did not complete.")
 
     except Exception as e:
-        print(f"Session Error: {e}")
+        print(f"🚨 CRITICAL SESSION ERROR: {e}")
+        traceback.print_exc()
     finally:
+        # Crucial for 2015 MacBook Air: Completely kill browser to free RAM
+        print("🧹 Cleaning up session resources...")
         engine.stop()
 
-if __name__ == "__main__":
-    print("🤖 UNIVERSAL AGENT v3.1 ACTIVE")
+def daily_heartbeat():
+    """Calculates a random daily plan of 8-10 posts and executes it."""
+    print("\n" + "="*50)
+    print("🤖 UNIVERSAL AI AGENT v3.4: 24/7 MODE ACTIVE")
+    print("="*50 + "\n")
+
+    cycle_num = 0
     while True:
-        # Plan for 8 to 10 posts in a cycle
-        daily_count = random.randint(8, 10)
-        print(f"\nPlan: {daily_count} posts for this cycle.")
+        cycle_num += 1
+        # Manager Requirement: 8-10 posts per cycle
+        posts_to_make = random.randint(8, 10)
+        print(f"📅 NEW CYCLE #{cycle_num}: Plan is to post {posts_to_make} times.")
 
-        for i in range(daily_count):
-            run_autonomous_session()
+        for i in range(posts_to_make):
+            execute_autonomous_session()
             
-            # Wait for 1.5 - 2.5 hours
-            # wait_time = random.randint(5400, 9000) 
+            # --- STOCHASTIC WAIT TIMER ---
+            # Random wait between tasks (90 to 180 minutes for production)
+            # For your demo/testing, use (60, 120) seconds
             wait_time = random.randint(60, 120) 
+            
+            wake_up = datetime.datetime.now() + datetime.timedelta(seconds=wait_time)
+            print(f"\n💤 Task {i+1}/{posts_to_make} complete. Sleeping until {wake_up.strftime('%H:%M:%S')}")
 
+            # Visual Countdown
+            for remaining in range(wait_time, 0, -1):
+                print(f"⏳ Heartbeat resumes in: {remaining}s   ", end="\r")
+                time.sleep(1)
             
-            # For testing, you can change this to random.randint(60, 120)
-            
-            wake_time = datetime.datetime.now() + datetime.timedelta(seconds=wait_time)
-            print(f"Next task at: {wake_time.strftime('%H:%M:%S')}")
-            time.sleep(wait_time)
+            print("\n🚀 Waking up for next task...")
+
+if __name__ == "__main__":
+    try:
+        daily_heartbeat()
+    except KeyboardInterrupt:
+        print("\n👋 Agent shutdown by user.")
